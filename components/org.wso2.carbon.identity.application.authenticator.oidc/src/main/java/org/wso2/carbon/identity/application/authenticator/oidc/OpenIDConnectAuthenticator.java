@@ -18,6 +18,9 @@
 package org.wso2.carbon.identity.application.authenticator.oidc;
 
 import com.nimbusds.jose.util.JSONObjectUtils;
+import io.asgardio.java.oidc.sdk.OIDCManager;
+import io.asgardio.java.oidc.sdk.OIDCManagerImpl;
+import io.asgardio.java.oidc.sdk.bean.OIDCAgentConfig;
 import net.minidev.json.JSONArray;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections.MapUtils;
@@ -280,84 +283,97 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
 
         try {
             Map<String, String> authenticatorProperties = context.getAuthenticatorProperties();
-            if (authenticatorProperties != null) {
-                String clientId = authenticatorProperties.get(OIDCAuthenticatorConstants.CLIENT_ID);
-                String authorizationEP = getOIDCAuthzEndpoint(authenticatorProperties);
-                String callbackurl = getCallbackUrl(authenticatorProperties);
-                String state = getStateParameter(context, authenticatorProperties);
 
-                OAuthClientRequest authzRequest;
+            OIDCAgentConfig config = new OIDCAgentConfig();
+            config.initConfig(authenticatorProperties);
 
-                String queryString = getQueryString(authenticatorProperties);
-                queryString = interpretQueryString(queryString, request.getParameterMap());
-                Map<String, String> paramValueMap = new HashMap<>();
+            OIDCManager oidcManager = new OIDCManagerImpl(config);
 
-                if (StringUtils.isNotBlank(queryString)) {
-                    String[] params = queryString.split("&");
-                    for (String param : params) {
-                        String[] intParam = param.split("=");
-                        if (intParam.length >= 2) {
-                            paramValueMap.put(intParam[0], intParam[1]);
-                        }
-                    }
-                    context.setProperty(OIDCAuthenticatorConstants.OIDC_QUERY_PARAM_MAP_PROPERTY_KEY, paramValueMap);
-                }
+            oidcManager.login(request, response);
 
-                String scope = paramValueMap.get(OAuthConstants.OAuth20Params.SCOPE);
-                scope = getScope(scope, authenticatorProperties);
+//            if (authenticatorProperties != null) {
+//                String clientId = authenticatorProperties.get(OIDCAuthenticatorConstants.CLIENT_ID);
+//                String authorizationEP = getOIDCAuthzEndpoint(authenticatorProperties);
+//                String callbackurl = getCallbackUrl(authenticatorProperties);
+//                String state = getStateParameter(context, authenticatorProperties);
+//
+//                OAuthClientRequest authzRequest;
+//
+//                String queryString = getQueryString(authenticatorProperties);
+//                queryString = interpretQueryString(queryString, request.getParameterMap());
+//                Map<String, String> paramValueMap = new HashMap<>();
+//
+//                if (StringUtils.isNotBlank(queryString)) {
+//                    String[] params = queryString.split("&");
+//                    for (String param : params) {
+//                        String[] intParam = param.split("=");
+//                        if (intParam.length >= 2) {
+//                            paramValueMap.put(intParam[0], intParam[1]);
+//                        }
+//                    }
+//                    context.setProperty(OIDCAuthenticatorConstants.OIDC_QUERY_PARAM_MAP_PROPERTY_KEY, paramValueMap);
+//                }
+//
+//                String scope = paramValueMap.get(OAuthConstants.OAuth20Params.SCOPE);
+//                scope = getScope(scope, authenticatorProperties);
+//
+//                if (StringUtils.isNotBlank(queryString) && queryString.toLowerCase().contains("scope=") && queryString
+//                        .toLowerCase().contains("redirect_uri=")) {
+//                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
+//                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE).setState(state)
+//                            .buildQueryMessage();
+//                } else if (StringUtils.isNotBlank(queryString) && queryString.toLowerCase().contains("scope=")) {
+//                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
+//                            .setRedirectURI(callbackurl)
+//                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE).setState(state)
+//                            .buildQueryMessage();
+//                } else if (StringUtils.isNotBlank(queryString) && queryString.toLowerCase().contains("redirect_uri=")) {
+//                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
+//                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE)
+//                            .setScope(OIDCAuthenticatorConstants.OAUTH_OIDC_SCOPE).setState(state).buildQueryMessage();
+//
+//                } else {
+//                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
+//                            .setRedirectURI(callbackurl)
+//                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE).setScope(scope)
+//                            .setState(state).buildQueryMessage();
+//                }
+//
+//                String loginPage = authzRequest.getLocationUri();
+//                String domain = request.getParameter("domain");
+//
+//                if (StringUtils.isNotBlank(domain)) {
+//                    loginPage = loginPage + "&fidp=" + domain;
+//                }
+//
+//                if (StringUtils.isNotBlank(queryString)) {
+//                    if (!queryString.startsWith("&")) {
+//                        loginPage = loginPage + "&" + queryString;
+//                    } else {
+//                        loginPage = loginPage + queryString;
+//                    }
+//                }
+//                response.sendRedirect(loginPage);
+//            } else {
+//                if (log.isDebugEnabled()) {
+//                    log.debug("Error while retrieving properties. Authenticator Properties cannot be null");
+//                }
+//                throw new AuthenticationFailedException(
+//                        "Error while retrieving properties. Authenticator Properties cannot be null");
+//            }
+//        } catch (IOException e) {
+//            log.error("Exception while sending to the login page", e);
+//            throw new AuthenticationFailedException(e.getMessage(), e);
+//        } catch (OAuthSystemException e) {
+//            log.error("Exception while building authorization code request", e);
+//            throw new AuthenticationFailedException(e.getMessage(), e);
+//        }
+//        return;
 
-                if (StringUtils.isNotBlank(queryString) && queryString.toLowerCase().contains("scope=") && queryString
-                        .toLowerCase().contains("redirect_uri=")) {
-                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
-                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE).setState(state)
-                            .buildQueryMessage();
-                } else if (StringUtils.isNotBlank(queryString) && queryString.toLowerCase().contains("scope=")) {
-                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
-                            .setRedirectURI(callbackurl)
-                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE).setState(state)
-                            .buildQueryMessage();
-                } else if (StringUtils.isNotBlank(queryString) && queryString.toLowerCase().contains("redirect_uri=")) {
-                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
-                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE)
-                            .setScope(OIDCAuthenticatorConstants.OAUTH_OIDC_SCOPE).setState(state).buildQueryMessage();
-
-                } else {
-                    authzRequest = OAuthClientRequest.authorizationLocation(authorizationEP).setClientId(clientId)
-                            .setRedirectURI(callbackurl)
-                            .setResponseType(OIDCAuthenticatorConstants.OAUTH2_GRANT_TYPE_CODE).setScope(scope)
-                            .setState(state).buildQueryMessage();
-                }
-
-                String loginPage = authzRequest.getLocationUri();
-                String domain = request.getParameter("domain");
-
-                if (StringUtils.isNotBlank(domain)) {
-                    loginPage = loginPage + "&fidp=" + domain;
-                }
-
-                if (StringUtils.isNotBlank(queryString)) {
-                    if (!queryString.startsWith("&")) {
-                        loginPage = loginPage + "&" + queryString;
-                    } else {
-                        loginPage = loginPage + queryString;
-                    }
-                }
-                response.sendRedirect(loginPage);
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Error while retrieving properties. Authenticator Properties cannot be null");
-                }
-                throw new AuthenticationFailedException(
-                        "Error while retrieving properties. Authenticator Properties cannot be null");
-            }
         } catch (IOException e) {
             log.error("Exception while sending to the login page", e);
             throw new AuthenticationFailedException(e.getMessage(), e);
-        } catch (OAuthSystemException e) {
-            log.error("Exception while building authorization code request", e);
-            throw new AuthenticationFailedException(e.getMessage(), e);
         }
-        return;
     }
 
     private String getStateParameter(AuthenticationContext context, Map<String, String> authenticatorProperties) {
