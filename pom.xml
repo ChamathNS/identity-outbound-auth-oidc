@@ -185,6 +185,11 @@
                 <version>${commons-codec.version}</version>
             </dependency>
             <dependency>
+                <groupId>javax.servlet</groupId>
+                <artifactId>javax.servlet-api</artifactId>
+                <version>${javax.servlet-api.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-log4j12</artifactId>
                 <version>${org.slf4j.verison}</version>
@@ -224,11 +229,11 @@
                 <artifactId>org.apache.felix.scr.ds-annotations</artifactId>
                 <version>${apache.felix.scr.ds.annotations.version}</version>
             </dependency>
-            <dependency>
-                <groupId>org.wso2.orbit.com.nimbusds</groupId>
-                <artifactId>nimbus-jose-jwt</artifactId>
-                <version>${nimbusds.version}</version>
-            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>org.wso2.orbit.com.nimbusds</groupId>-->
+<!--                <artifactId>nimbus-jose-jwt</artifactId>-->
+<!--                <version>${nimbusds.version}</version>-->
+<!--            </dependency>-->
         </dependencies>
     </dependencyManagement>
 
@@ -334,7 +339,7 @@
         <maven.surefire.plugin.version>2.18.1</maven.surefire.plugin.version>
         <mokito.version>1.6.6</mokito.version>
         <carbon.identity.oauth.common.version>6.2.0</carbon.identity.oauth.common.version>
-        <io.asgardio.java.oidc.sdk.version>0.1.1-SNAPSHOT</io.asgardio.java.oidc.sdk.version>
+        <io.asgardio.java.oidc.sdk.version>0.1.2-SNAPSHOT</io.asgardio.java.oidc.sdk.version>
 
         <commons-lang.wso2.version>2.6.0.wso2v1</commons-lang.wso2.version>
         <commons-collections.wso2.version>3.2.2.wso2v1</commons-collections.wso2.version>
@@ -360,8 +365,9 @@
         <pax.logging.api.version>1.10.1</pax.logging.api.version>
         <apache.felix.scr.ds.annotations.version>1.2.4</apache.felix.scr.ds.annotations.version>
         <maven.scr.plugin.version>1.22.0</maven.scr.plugin.version>
-        <nimbusds.version>7.3.0.wso2v1</nimbusds.version>
+        <nimbusds.version>8.19</nimbusds.version>
         <nimbusds.osgi.version.range>[7.3.0,8.0.0)</nimbusds.osgi.version.range>
+        <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     </properties>
 
     <modules>
