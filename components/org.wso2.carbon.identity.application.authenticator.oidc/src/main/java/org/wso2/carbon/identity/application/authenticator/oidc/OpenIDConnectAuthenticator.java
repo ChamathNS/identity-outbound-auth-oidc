@@ -22,6 +22,7 @@ import io.asgardio.java.oidc.sdk.OIDCManager;
 import io.asgardio.java.oidc.sdk.OIDCManagerImpl;
 import io.asgardio.java.oidc.sdk.bean.OIDCAgentConfig;
 import io.asgardio.java.oidc.sdk.bean.User;
+import io.asgardio.java.oidc.sdk.exception.SSOAgentException;
 import net.minidev.json.JSONArray;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections.MapUtils;
@@ -286,11 +287,11 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
         try {
             Map<String, String> authenticatorProperties = context.getAuthenticatorProperties();
             String sessionState = getStateParameter(context, authenticatorProperties);
-            authenticatorProperties.put("state", sessionState);
+//            authenticatorProperties.put("state", sessionState);
             config.initConfig(authenticatorProperties);
 
             OIDCManager oidcManager = new OIDCManagerImpl(config);
-            oidcManager.login(request, response);
+            oidcManager.sendForLogin(request, response, sessionState);
 
         } catch (IOException e) {
             log.error("Exception while sending to the login page", e);
@@ -343,30 +344,39 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
                                          AuthenticationContext context) throws LogoutFailedException {
 
         if (isLogoutEnabled(context)) {
-            String logoutUrl = getLogoutUrl(context.getAuthenticatorProperties());
+//            String logoutUrl = getLogoutUrl(context.getAuthenticatorProperties());
+//
+//            Map<String, String> paramMap = new HashMap<>();
+//
+//            String idTokenHint = getIdTokenHint(context);
+//            if (StringUtils.isNotBlank(idTokenHint)) {
+//                paramMap.put(OIDCAuthenticatorConstants.ID_TOKEN_HINT, idTokenHint);
+//            }
+//
+//            String callback = getCallbackUrl(context.getAuthenticatorProperties());
+//            paramMap.put(OIDCAuthenticatorConstants.POST_LOGOUT_REDIRECT_URI, callback);
+//
+//            String sessionID = getStateParameter(context, context.getAuthenticatorProperties());
+//            paramMap.put(OIDCAuthenticatorConstants.OAUTH2_PARAM_STATE, sessionID);
+//
+//            try {
+//                logoutUrl = FrameworkUtils.buildURLWithQueryParams(logoutUrl, paramMap);
+////                response.sendRedirect(logoutUrl);
+//            } catch (IOException e) {
+//                String idpName = context.getExternalIdP().getName();
+//                String tenantDomain = context.getTenantDomain();
+//                throw new LogoutFailedException("Error occurred while initiating the logout request to IdP: " + idpName
+//                        + " of tenantDomain: " + tenantDomain, e);
+//            }
 
-            Map<String, String> paramMap = new HashMap<>();
-
-            String idTokenHint = getIdTokenHint(context);
-            if (StringUtils.isNotBlank(idTokenHint)) {
-                paramMap.put(OIDCAuthenticatorConstants.ID_TOKEN_HINT, idTokenHint);
-            }
-
-            String callback = getCallbackUrl(context.getAuthenticatorProperties());
-            paramMap.put(OIDCAuthenticatorConstants.POST_LOGOUT_REDIRECT_URI, callback);
-
-            String sessionID = getStateParameter(context, context.getAuthenticatorProperties());
-            paramMap.put(OIDCAuthenticatorConstants.OAUTH2_PARAM_STATE, sessionID);
-
+            OIDCManager oidcManager = new OIDCManagerImpl(config);
             try {
-                logoutUrl = FrameworkUtils.buildURLWithQueryParams(logoutUrl, paramMap);
-                response.sendRedirect(logoutUrl);
-            } catch (IOException e) {
-                String idpName = context.getExternalIdP().getName();
-                String tenantDomain = context.getTenantDomain();
-                throw new LogoutFailedException("Error occurred while initiating the logout request to IdP: " + idpName
-                        + " of tenantDomain: " + tenantDomain, e);
+                String state = getStateParameter(context, context.getAuthenticatorProperties());
+                oidcManager.logout(request, response, state);
+            } catch (SSOAgentException | IOException e) {
+                e.printStackTrace();
             }
+
         } else {
             super.initiateLogoutRequest(request, response, context);
         }
