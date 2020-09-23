@@ -18,8 +18,12 @@
 package org.wso2.carbon.identity.application.authenticator.oidc;
 
 import com.nimbusds.jose.util.JSONObjectUtils;
+import com.nimbusds.oauth2.sdk.Scope;
+import com.nimbusds.oauth2.sdk.auth.Secret;
+import com.nimbusds.oauth2.sdk.id.ClientID;
 import io.asgardio.java.oidc.sdk.OIDCManager;
 import io.asgardio.java.oidc.sdk.OIDCManagerImpl;
+import io.asgardio.java.oidc.sdk.bean.FileBasedOIDCAgentConfig;
 import io.asgardio.java.oidc.sdk.bean.OIDCAgentConfig;
 import io.asgardio.java.oidc.sdk.bean.User;
 import io.asgardio.java.oidc.sdk.exception.SSOAgentException;
@@ -43,6 +47,7 @@ import org.wso2.carbon.base.MultitenantConstants;
 import org.wso2.carbon.identity.application.authentication.framework.AbstractApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.FederatedApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthenticationContext;
+import org.wso2.carbon.identity.application.authentication.framework.exception.ApplicationAuthenticatorException;
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.exception.LogoutFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
@@ -67,6 +72,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -95,8 +102,6 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
 
     private static final String DYNAMIC_PARAMETER_LOOKUP_REGEX = "\\$\\{(\\w+)\\}";
     private static Pattern pattern = Pattern.compile(DYNAMIC_PARAMETER_LOOKUP_REGEX);
-
-    OIDCAgentConfig config = new OIDCAgentConfig();
 
     @Override
     protected void processLogoutResponse(HttpServletRequest request, HttpServletResponse response,
@@ -287,13 +292,12 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
         try {
             Map<String, String> authenticatorProperties = context.getAuthenticatorProperties();
             String sessionState = getStateParameter(context, authenticatorProperties);
-//            authenticatorProperties.put("state", sessionState);
-            config.initConfig(authenticatorProperties);
+            OIDCAgentConfig config = getConfig(context);
 
             OIDCManager oidcManager = new OIDCManagerImpl(config);
             oidcManager.sendForLogin(request, response, sessionState);
 
-        } catch (IOException e) {
+        } catch (IOException | ApplicationAuthenticatorException e) {
             log.error("Exception while sending to the login page", e);
             throw new AuthenticationFailedException(e.getMessage(), e);
         }
@@ -318,24 +322,26 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
     protected void processAuthenticationResponse(HttpServletRequest request, HttpServletResponse response,
                                                  AuthenticationContext context) throws AuthenticationFailedException {
 
-        OIDCManager oidcManager = new OIDCManagerImpl(config);
         try {
-            oidcManager.handleOIDCCallback(request, response);
-            HttpSession session = request.getSession(false);
-            User user = (User) session.getAttribute("user");
-            Map<String, Object> attributes = user.getAttributes();
-            String attributeSeparator = getMultiAttributeSeparator(context, user.getSubject());
+            OIDCAgentConfig config = getConfig(context);
+            OIDCManager oidcManager = new OIDCManagerImpl(config);
+            io.asgardio.java.oidc.sdk.bean.AuthenticationContext authenticationContext =
+                    oidcManager.handleOIDCCallback(request, response);
+            User user = authenticationContext.getUser();
             AuthenticatedUser authenticatedUser =
                     AuthenticatedUser.createFederateAuthenticatedUserFromSubjectIdentifier(user.getSubject());
 
             Map<ClaimMapping, String> claims = new HashMap<>();
+            Map<String, Object> attributes = user.getAttributes();
+            String attributeSeparator = getMultiAttributeSeparator(context, user.getSubject());
             for (Map.Entry<String, Object> entry : attributes.entrySet()) {
                 buildClaimMappings(claims, entry, attributeSeparator);
             }
             authenticatedUser.setUserAttributes(claims);
             context.setSubject(authenticatedUser);
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException | ApplicationAuthenticatorException e) {
+            log.error("Exception while processing the authentication response.", e);
+            throw new AuthenticationFailedException(e.getMessage(), e);
         }
     }
 
@@ -344,39 +350,15 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
                                          AuthenticationContext context) throws LogoutFailedException {
 
         if (isLogoutEnabled(context)) {
-//            String logoutUrl = getLogoutUrl(context.getAuthenticatorProperties());
-//
-//            Map<String, String> paramMap = new HashMap<>();
-//
-//            String idTokenHint = getIdTokenHint(context);
-//            if (StringUtils.isNotBlank(idTokenHint)) {
-//                paramMap.put(OIDCAuthenticatorConstants.ID_TOKEN_HINT, idTokenHint);
-//            }
-//
-//            String callback = getCallbackUrl(context.getAuthenticatorProperties());
-//            paramMap.put(OIDCAuthenticatorConstants.POST_LOGOUT_REDIRECT_URI, callback);
-//
-//            String sessionID = getStateParameter(context, context.getAuthenticatorProperties());
-//            paramMap.put(OIDCAuthenticatorConstants.OAUTH2_PARAM_STATE, sessionID);
-//
-//            try {
-//                logoutUrl = FrameworkUtils.buildURLWithQueryParams(logoutUrl, paramMap);
-////                response.sendRedirect(logoutUrl);
-//            } catch (IOException e) {
-//                String idpName = context.getExternalIdP().getName();
-//                String tenantDomain = context.getTenantDomain();
-//                throw new LogoutFailedException("Error occurred while initiating the logout request to IdP: " + idpName
-//                        + " of tenantDomain: " + tenantDomain, e);
-//            }
-
-            OIDCManager oidcManager = new OIDCManagerImpl(config);
             try {
+                OIDCAgentConfig config = getConfig(context);
+                OIDCManager oidcManager = new OIDCManagerImpl(config);
                 String state = getStateParameter(context, context.getAuthenticatorProperties());
-                oidcManager.logout(request, response, state);
-            } catch (SSOAgentException | IOException e) {
-                e.printStackTrace();
+                oidcManager.logout(context, response, state);
+            } catch (SSOAgentException | ApplicationAuthenticatorException | IOException e) {
+                log.error("Error occurred while initiating the logout request to IdP.");
+                throw new LogoutFailedException(e.getMessage(), e);
             }
-
         } else {
             super.initiateLogoutRequest(request, response, context);
         }
@@ -915,6 +897,53 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
         }
 
         return null;
+    }
+
+    private OIDCAgentConfig getConfig(AuthenticationContext context) throws ApplicationAuthenticatorException {
+
+        OIDCAgentConfig config = new FileBasedOIDCAgentConfig();
+        Map<String, String> authenticatorProperties = context.getAuthenticatorProperties();
+        ClientID clientID = StringUtils.isNotBlank(authenticatorProperties.get(OIDCAuthenticatorConstants.CLIENT_ID)) ?
+                new ClientID(authenticatorProperties.get(OIDCAuthenticatorConstants.CLIENT_ID)) : null;
+        Secret clientSecret =
+                StringUtils.isNotBlank(authenticatorProperties.get(OIDCAuthenticatorConstants.CLIENT_SECRET)) ?
+                        new Secret(authenticatorProperties.get(OIDCAuthenticatorConstants.CLIENT_SECRET)) : null;
+        Scope scope = new Scope(OIDCAuthenticatorConstants.OAUTH_OIDC_SCOPE);
+        try {
+            URI callbackUrl =
+                    StringUtils.isNotBlank(
+                            authenticatorProperties.get(OIDCAuthenticatorConstants.IdPConfParams.CALLBACK_URL)) ?
+                            new URI(authenticatorProperties
+                                    .get(OIDCAuthenticatorConstants.IdPConfParams.CALLBACK_URL)) : null;
+            URI tokenEndpoint =
+                    StringUtils.isNotBlank(
+                            authenticatorProperties.get(OIDCAuthenticatorConstants.OAUTH2_TOKEN_URL)) ?
+                            new URI(authenticatorProperties.get(OIDCAuthenticatorConstants.OAUTH2_TOKEN_URL)) :
+                            null;
+            URI authorizeEndpoint =
+                    StringUtils.isNotBlank(
+                            authenticatorProperties.get(OIDCAuthenticatorConstants.OAUTH2_AUTHZ_URL)) ?
+                            new URI(authenticatorProperties
+                                    .get(OIDCAuthenticatorConstants.OAUTH2_AUTHZ_URL)) : null;
+            URI logoutEndpoint =
+                    StringUtils.isNotBlank(
+                            authenticatorProperties.get(OIDCAuthenticatorConstants.IdPConfParams.OIDC_LOGOUT_URL)) ?
+                            new URI(authenticatorProperties
+                                    .get(OIDCAuthenticatorConstants.IdPConfParams.OIDC_LOGOUT_URL)) : null;
+
+            config.setConsumerKey(clientID);
+            config.setConsumerSecret(clientSecret);
+            config.setScope(scope);
+            config.setCallbackUrl(callbackUrl);
+            config.setTokenEndpoint(tokenEndpoint);
+            config.setAuthorizeEndpoint(authorizeEndpoint);
+            config.setLogoutEndpoint(logoutEndpoint);
+            config.setPostLogoutRedirectURI(callbackUrl);
+        } catch (URISyntaxException e) {
+            log.error("Exception while reading URIs for the authenticator.", e);
+            throw new ApplicationAuthenticatorException(e.getMessage(), e);
+        }
+        return config;
     }
 }
 
