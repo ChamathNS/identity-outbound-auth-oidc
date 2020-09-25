@@ -16,6 +16,8 @@
 
 package org.wso2.carbon.identity.application.authenticator.oidc.model;
 
+import io.asgardio.java.oidc.sdk.bean.AuthenticationInfo;
+import io.asgardio.java.oidc.sdk.bean.User;
 import org.wso2.carbon.identity.application.authentication.framework.AuthenticatorStateInfo;
 
 /**
@@ -24,6 +26,7 @@ import org.wso2.carbon.identity.application.authentication.framework.Authenticat
 public class OIDCStateInfo extends AuthenticatorStateInfo {
 
     private String idTokenHint;
+    private AuthenticationInfo authenticationInfo;
 
     public void setIdTokenHint(String idTokenHint) {
 
@@ -33,5 +36,15 @@ public class OIDCStateInfo extends AuthenticatorStateInfo {
     public String getIdTokenHint() {
 
         return idTokenHint;
+    }
+
+    public AuthenticationInfo getAuthenticationInfo() {
+
+        return authenticationInfo;
+    }
+
+    public void setAuthenticationInfo(AuthenticationInfo authenticationInfo) {
+
+        this.authenticationInfo = authenticationInfo;
     }
 }
