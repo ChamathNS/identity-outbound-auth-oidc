@@ -21,10 +21,11 @@ import com.nimbusds.jose.util.JSONObjectUtils;
 import io.asgardio.java.oidc.sdk.OIDCManager;
 import io.asgardio.java.oidc.sdk.OIDCManagerImpl;
 import io.asgardio.java.oidc.sdk.bean.AuthenticationInfo;
-import io.asgardio.java.oidc.sdk.bean.OIDCAgentConfig;
 import io.asgardio.java.oidc.sdk.bean.User;
+import io.asgardio.java.oidc.sdk.config.model.OIDCAgentConfig;
 import io.asgardio.java.oidc.sdk.exception.SSOAgentClientException;
 import io.asgardio.java.oidc.sdk.exception.SSOAgentException;
+import io.asgardio.java.oidc.sdk.exception.SSOAgentServerException;
 import net.minidev.json.JSONArray;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections.MapUtils;
@@ -337,8 +338,8 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
             }
             authenticatedUser.setUserAttributes(claims);
             context.setSubject(authenticatedUser);
-            
-        } catch (IOException | ApplicationAuthenticatorException | SSOAgentClientException e) {
+
+        } catch (IOException | ApplicationAuthenticatorException | SSOAgentClientException | SSOAgentServerException e) {
             log.error("Exception while processing the authentication response.", e);
             throw new AuthenticationFailedException(e.getMessage(), e);
         }
@@ -354,7 +355,7 @@ public class OpenIDConnectAuthenticator extends AbstractApplicationAuthenticator
                 OIDCManager oidcManager = new OIDCManagerImpl(config);
                 String state = getStateParameter(context, context.getAuthenticatorProperties());
                 AuthenticationInfo authenticationInfo = getAuthenticationInfo(context);
-                
+
                 oidcManager.logout(authenticationInfo, response, state);
             } catch (SSOAgentException | ApplicationAuthenticatorException | IOException e) {
                 log.error("Error occurred while initiating the logout request to IdP.");
